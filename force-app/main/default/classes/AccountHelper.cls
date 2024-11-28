@@ -28,13 +28,69 @@ Always ensure that your helper methods are bulk-safe to handle multiple records 
 */
 public with sharing class AccountHelper {
     
-    public void setTypeProspect(SObject objects){
+    public static void setTypeProspect(List<Account> newAccounts){
+        for(Account acc :newAccounts){
+            if (acc.Type == null) {
+                acc.Type = 'Prospect';
+            }
+        }          
 
+            }
+        
+
+    
+
+    //void addressCopy(){
+
+    //}
+     public static void addressCopy(List<Account> newAccounts1){
+        for (Account acc : newAccounts1) {
+             if (acc.ShippingStreet != null) {
+            acc.BillingStreet = acc.ShippingStreet;
+        }
+        if (acc.ShippingCity != null) {
+            acc.BillingCity = acc.ShippingCity;
+        }
+        if (acc.ShippingState != null) {
+            acc.BillingState = acc.ShippingState;
+        }
+        if (acc.ShippingPostalCode != null) {
+            acc.BillingPostalCode = acc.ShippingPostalCode;
+        }
+        if (acc.ShippingCountry != null) {
+            acc.BillingCountry = acc.ShippingCountry;
+        }
     }
+     }
 
-    void addressCopy(){
-
+    public static void setRating(List<Account> newAccounts2){
+        for(Account acc : newAccounts2){
+            if(acc.Phone != null && acc.Website !=null && acc.Fax != null){
+                acc.Rating = 'Hot';
+            }
+        }
     }
+    public static void defaultContact(List<Account> newAccounts3){
+        List<Contact> listOfContacts = new List<Contact>();
+        for(Account acc : newAccounts3){
+            Contact con = new Contact();
+            con.AccountId = acc.Id;
+            con.FirstName = 'DefaultContact';
+            con.LastName = 'DefaultContact';
+            con.Email = 'default@email.com';
+            listOfContacts.add(con);
+        }
+        if(!listOfContacts.isEmpty()){
+            insert listofContacts;
+        }
+    }
+}
+
+
+    
+    
+
+    
 
     //[public | private ] [static] data_type setRating (input parameters) {
     //  The body of the method
@@ -43,4 +99,3 @@ public with sharing class AccountHelper {
     //[public | private ] [static] data_type defaultContact (input parameters) {
     //  The body of the method
     //}
-}

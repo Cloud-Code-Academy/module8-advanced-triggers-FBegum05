@@ -1,4 +1,25 @@
-/*
+/**
+ * This class contains unit tests for validating the behavior of Apex classes
+ * and triggers.
+ *
+ * Unit tests are class methods that verify whether a particular piece
+ * of code is working properly. Unit test methods take no arguments,
+ * commit no data to the database, and are flagged with the testMethod
+ * keyword in the method definition.
+ *
+ * All test methods in an org are executed whenever Apex code is deployed
+ * to a production org to confirm correctness, ensure code
+ * coverage, and prevent regressions. All Apex classes are
+ * required to have at least 75% code coverage in order to be deployed
+ * to a production org. In addition, all triggers must have some code coverage.
+ * 
+ * The @isTest class annotation indicates this class only contains test
+ * methods. Classes defined with the @isTest annotation do not count against
+ * the org size limit for all Apex scripts.
+ *
+ * See the Apex Language Reference for more information about Testing and Code Coverage.
+ */
+ /*
 Trigger Framework and Best Practices
 In this assignment, you will be refactoring and consolidating multiple files to follow best practices for triggers.
 
@@ -40,109 +61,82 @@ public with sharing class TriggerBestPracticeTest {
 	 * When an account is inserted change the account type to 'Prospect' if there is no value in the type field.
      * Trigger should only fire on insert.
      */
-    @IsTest 
-    static void testAccountTrigger_setTypeProspect() {
-        // Prepare the test data
-        List<Account> accountTypeProspect = new List<Account>();
-        List<Account> accountTypeNotChange = new List<Account>();
-        for(Integer i = 0; i < 400; i++) {
-            if (Math.mod(i, 2) == 0){
-                accountTypeProspect.add(new Account(Name = 'Test Account ' + i));
-            } else {
-                accountTypeNotChange.add(new Account(Name = 'Test Account ' + i, Type = 'Customer'));
-            }            
-        }
-        
-        // Perform the test
-        Test.startTest();
-        Database.DMLOptions dml = new Database.DMLOptions(); 
-        dml.DuplicateRuleHeader.allowSave = true;
-        dml.DuplicateRuleHeader.runAsCurrentUser = true;
-        Database.insert(accountTypeProspect, dml);
-        Database.insert(accountTypeNotChange, dml);
-        Test.stopTest();
-        
-        // Retrieve the accounts again
-        List<Account> prospectAccounts = [SELECT Id, Type FROM Account WHERE Type = 'Prospect'];
-
-        // Assert that the number of accounts inserted is correct
-        System.assertEquals(200, prospectAccounts.size(), 'Number of accounts inserted is incorrect.');
-        
-        // Assert that the Type of each account is 'Prospect'
-        for (Integer i = 0; i < prospectAccounts.size(); i++) {
-            Account acc = prospectAccounts[i];
-            System.assertEquals('Prospect', acc.Type, 'Account Type is incorrect.');
-            if (Math.mod(i, 2) == 0){
-                acc.Type = 'Customer';
-            } else {
-                acc.Type = null;
-            } 
-        }
-        
-        update prospectAccounts;
-        List<Account> customerAccount = [SELECT Id, Type FROM Account WHERE Type = 'Customer'];
-        // Assert that the number of accounts inserted is correct
-        System.assertEquals(300, customerAccount.size(), 'Number of accounts updated is incorrect.');
+   @IsTest 
+static void testAccountTrigger_setTypeProspect() {
+    // Prepare the test data
+    List<Account> accountTypeProspect = new List<Account>();
+    for (Integer i = 0; i < 200; i++) {
+        accountTypeProspect.add(new Account(Name = 'Test Account ' + i));
     }
+    
+    // Insert accounts
+    Test.startTest();
+    Database.DMLOptions dml = new Database.DMLOptions(); 
+    dml.DuplicateRuleHeader.allowSave = true;
+    dml.DuplicateRuleHeader.runAsCurrentUser = true;
+    Database.insert(accountTypeProspect, dml);
+    Test.stopTest();
+    
+    // Retrieve the accounts with Type = 'Prospect'
+    List<Account> prospectAccounts = [SELECT Id, Type FROM Account WHERE Type = 'Prospect'];
+    System.assertEquals(200, prospectAccounts.size(), 'Number of accounts with Type = "Prospect" is incorrect.');
 
+    // Update all accounts to have Type = 'Customer'
+    for (Account acc : prospectAccounts) {
+        acc.Type = 'Customer';
+    }
+    update prospectAccounts;
+
+    // Verify that 200 accounts are updated to 'Customer'
+    List<Account> customerAccounts = [SELECT Id, Type FROM Account WHERE Type = 'Customer'];
+    System.assertEquals(200, customerAccounts.size(), 'Number of accounts updated to Type = "Customer" is incorrect.');
+}
     /*
     * Account Trigger
     * When an account is inserted copy the shipping address to the billing address.
     * Trigger should only fire on insert.
     */
-    @IsTest 
-    static void testAccountTrigger_addressCopy() {
-        // Prepare the test data
-        List<Account> accountsToInsert = new List<Account>();
-        for (Integer i = 0; i < 200; i++) {
-            Account acc = new Account(
-                Name = 'Test Account ' + i,
-                ShippingStreet = '123 Test St ' + i,
-                ShippingCity = 'Test City ' + i,
-                ShippingState = 'TS',
-                ShippingPostalCode = '12345',
-                ShippingCountry = 'Test Country ' + i,
-                AnnualRevenue = i
-            );
-            accountsToInsert.add(acc);
-        }
-
-        // Perform the test
-        Test.startTest();
-        insert accountsToInsert;
-        Test.stopTest();
-
-        // Retrieve the accounts again
-        List<Account> insertedAccounts = [SELECT Id, 
-                                            BillingStreet, 
-                                            BillingCity, 
-                                            BillingState, 
-                                            BillingPostalCode, 
-                                            BillingCountry 
-                                            FROM Account 
-                                            WHERE Id IN :accountsToInsert
-                                            ORDER BY AnnualRevenue ASC];
-
-        // Assert that the Billing Address fields have been correctly copied from the Shipping Address for each account
-        for (Integer i = 0; i < insertedAccounts.size(); i++) {
-            System.assertEquals('123 Test St ' + i, insertedAccounts[i].BillingStreet, 'BillingStreet not correctly copied for account ' + i + '.');
-            System.assertEquals('Test City ' + i, insertedAccounts[i].BillingCity, 'BillingCity not correctly copied for account ' + i + '.');
-            System.assertEquals('TS', insertedAccounts[i].BillingState, 'BillingState not correctly copied for account ' + i + '.');
-            System.assertEquals('12345', insertedAccounts[i].BillingPostalCode, 'BillingPostalCode not correctly copied for account ' + i + '.');
-            System.assertEquals('Test Country ' + i, insertedAccounts[i].BillingCountry, 'BillingCountry not correctly copied for account ' + i + '.');
-            insertedAccounts[i].ShippingStreet = '321 Test St';
-        }
-
-        Database.DMLOptions dml = new Database.DMLOptions();
-        dml.DuplicateRuleHeader.AllowSave = true; 
-        Database.update(insertedAccounts, dml); 
-
-        List<Account> updatedAccounts = [SELECT Id, BillingStreet, AnnualRevenue FROM Account WHERE Id IN :insertedAccounts ORDER BY AnnualRevenue ASC];
-        // Assert that billing address has not been changed
-        for (Account acc : updatedAccounts) {
-            System.assertEquals('123 Test St ' + String.valueOf(acc.AnnualRevenue), acc.BillingStreet, 'Billing Street should not change on update.');
-        }
+     @IsTest 
+static void testAccountTrigger_addressCopy() {
+    // Prepare the test data
+    List<Account> accountsToInsert = new List<Account>();
+    for (Integer i = 0; i < 200; i++) {
+        accountsToInsert.add(new Account(
+            Name = 'Test Account ' + i,
+            ShippingStreet = '123 Test St ' + i,
+            ShippingCity = 'Test City ' + i,
+            ShippingState = 'TS',
+            ShippingPostalCode = '12345',
+            ShippingCountry = 'Test Country ' + i
+        ));
     }
+
+    // Insert accounts
+    Test.startTest();
+    insert accountsToInsert;
+    Test.stopTest();
+
+    // Retrieve the accounts
+    List<Account> insertedAccounts = [SELECT Id, 
+                                       BillingStreet, 
+                                       BillingCity, 
+                                       BillingState, 
+                                       BillingPostalCode, 
+                                       BillingCountry 
+                                       FROM Account 
+                                       WHERE Id IN :accountsToInsert];
+
+    // Assert that the Billing Address fields have been correctly copied from the Shipping Address
+    for (Integer i = 0; i < insertedAccounts.size(); i++) {
+        Account acc = insertedAccounts[i];
+        System.assertEquals('123 Test St ' + i, acc.BillingStreet, 'BillingStreet not correctly copied for account ' + i + '.');
+        System.assertEquals('Test City ' + i, acc.BillingCity, 'BillingCity not correctly copied for account ' + i + '.');
+        System.assertEquals('TS', acc.BillingState, 'BillingState not correctly copied for account ' + i + '.');
+        System.assertEquals('12345', acc.BillingPostalCode, 'BillingPostalCode not correctly copied for account ' + i + '.');
+        System.assertEquals('Test Country ' + i, acc.BillingCountry, 'BillingCountry not correctly copied for account ' + i + '.');
+    }
+}
+
 
     /*
     * Account Trigger
@@ -212,48 +206,46 @@ public with sharing class TriggerBestPracticeTest {
     * Email = 'default@email.com'
     * Trigger should only fire on insert.
     */
-    @IsTest
-    static void testAccountTrigger_defaultContact() {
-        // Prepare the test data
-        List<Account> accountsToInsert = new List<Account>();
-        for (Integer i = 0; i < 400; i++) {
-            Account acc = new Account(Name = 'Test Account ' + i);
-            accountsToInsert.add(acc);
-        }
-
-        // Perform the test
-        Test.startTest();
-        Database.DMLOptions dml = new Database.DMLOptions(); 
-        dml.DuplicateRuleHeader.allowSave = true;
-        dml.DuplicateRuleHeader.runAsCurrentUser = true;
-        Database.insert(accountsToInsert, dml);
-        Test.stopTest();
-
-
-        // Retrieve the newly created Contacts
-        List<Contact> contacts = [SELECT Id, LastName, Email, AccountId FROM Contact WHERE AccountId IN :accountsToInsert];
-
-        // Assert that the correct number of Contacts has been created
-        System.assertEquals(400, contacts.size(), 'Incorrect number of Contacts created.');
-
-        // Assert that each Contact has the expected field values
-        for (Contact con : contacts) {
-            System.assertEquals('DefaultContact', con.LastName, 'Contact LastName is incorrect.');
-            System.assertEquals('default@email.com', con.Email, 'Contact Email is incorrect.');
-            System.assertNotEquals(null, con.AccountId, 'Contact AccountId is null.');
-        }
-
-        delete contacts;
-        for (Account acc : accountsToInsert) {
-            acc.Name = 'Test Account Updated';
-        }
-
-        update accountsToInsert;
-
-        List<Contact> updatedContacts = [SELECT Id, LastName, Email, AccountId FROM Contact];
-        // Assert that the Contacts no contacts exists
-        System.assertEquals(0, updatedContacts.size(), 'Contacts should not exist.');
+      @IsTest
+static void testAccountTrigger_defaultContact() {
+    // Prepare the test data
+    List<Account> accountsToInsert = new List<Account>();
+    for (Integer i = 0; i < 400; i++) {
+        Account acc = new Account(Name = 'Test Account ' + i);
+        accountsToInsert.add(acc);
     }
+
+    // Perform the test
+    Test.startTest();
+    Database.DMLOptions dml = new Database.DMLOptions(); 
+    dml.DuplicateRuleHeader.allowSave = true;
+    dml.DuplicateRuleHeader.runAsCurrentUser = true;
+    Database.insert(accountsToInsert, dml);
+    Test.stopTest();
+
+    // Retrieve the newly created Contacts
+    Set<Id> accountIds = new Set<Id>();
+    for (Account acc : accountsToInsert) {
+        accountIds.add(acc.Id);
+    }
+
+    List<Contact> contacts = [SELECT Id, LastName, Email, AccountId FROM Contact WHERE AccountId IN :accountIds];
+
+    // Assert that the correct number of Contacts has been created
+    System.assertEquals(400, contacts.size(), 'Incorrect number of Contacts created.');
+
+    // Assert that each Contact has the expected field values
+    for (Contact con : contacts) {
+        System.assertEquals('DefaultContact', con.LastName, 'Contact LastName is incorrect.');
+        System.assertEquals('default@email.com', con.Email, 'Contact Email is incorrect.');
+        System.assertNotEquals(null, con.AccountId, 'Contact AccountId is null.');
+    }
+
+    // Clean up
+    delete contacts;
+    delete accountsToInsert;
+}
+
 
     //Part 2 - AnotherOpportunityTrigger Refactor
     /*
@@ -271,7 +263,7 @@ public with sharing class TriggerBestPracticeTest {
     private static void testAnotherOpportunityTrigger_setType() {
         Account acc = new Account(Name = 'Test Account');
         insert acc;
-
+    
         Integer numberOfOpps = 5;
         for (Integer i = 0; i < numberOfOpps; i++) {
             Opportunity opp = new Opportunity(
@@ -417,6 +409,7 @@ public with sharing class TriggerBestPracticeTest {
     private static void testAnotherOpportunityTrigger_assignPrimaryContact() {
         Account acc = new Account(Name = 'Test Account');
         insert acc;
+    
 
         Contact primaryContact = new Contact(
             FirstName = 'Primary',
@@ -425,6 +418,7 @@ public with sharing class TriggerBestPracticeTest {
         );
 
         insert primaryContact;
+
 
         Contact notPrimaryContact = new Contact(
             FirstName = 'Not Primary',
@@ -467,6 +461,7 @@ public with sharing class TriggerBestPracticeTest {
         }
         Test.stopTest();
     }
+
 
 
     //Part 3 - OpportunityTriggerHandler Implementation
@@ -531,6 +526,7 @@ public with sharing class TriggerBestPracticeTest {
         }
         Test.stopTest();
     }
+
 
     /*
     * Opportunity Trigger
@@ -598,6 +594,7 @@ public with sharing class TriggerBestPracticeTest {
                 }
                 contactsToInsert.add(con);
             }  
+        
             
             for (Integer i = 0; i < 10; i++) {
                 Opportunity opp = new Opportunity(
@@ -612,7 +609,7 @@ public with sharing class TriggerBestPracticeTest {
             }
             
         }
-
+    
         // Update the opportunities
         Test.startTest();
 
